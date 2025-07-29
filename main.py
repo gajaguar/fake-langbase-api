@@ -3,6 +3,7 @@ import json
 import time
 import uuid
 import re
+import random
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import threading
@@ -11,6 +12,11 @@ from typing import List, Dict, Any, Optional
 
 
 
+
+# Configuration constants
+CHUNK_DELAY_SECONDS = 1.0  # Configurable delay between chunks (default: 1 second)
+MIN_CHUNKS = 5  # Minimum number of chunks (configurable)
+MAX_CHUNKS = 10  # Maximum number of chunks (configurable)
 
 # Sample responses for simulation
 SAMPLE_RESPONSES = [
@@ -38,36 +44,66 @@ def get_sample_response(messages: List[Dict[str, str]]) -> str:
         return SAMPLE_RESPONSES[3]
 
 
-def split_into_chunks(text: str) -> List[str]:
-    """Split text into individual words and punctuation for streaming."""
-    # Split on whitespace but keep punctuation separate
+def generate_random_chunks(text: str, min_chunks: int = MIN_CHUNKS, max_chunks: int = MAX_CHUNKS) -> List[str]:
+    """Generate a random number of chunks from the text."""
+    # Determine random number of chunks
+    num_chunks = random.randint(min_chunks, max_chunks)
+
+    # If text is shorter than desired chunks, split by words/punctuation
     tokens = re.findall(r'\S+|\s+', text)
-    chunks = []
+    all_parts = []
 
     for token in tokens:
         if token.strip():  # Non-whitespace token
             # Further split punctuation from words
             parts = re.findall(r'\w+|[^\w\s]', token)
             for part in parts:
-                chunks.append(part)
+                all_parts.append(part)
             # Add space after word/punctuation (except for last token)
             if token != tokens[-1]:
-                chunks.append(" ")
+                all_parts.append(" ")
 
-    return [chunk for chunk in chunks if chunk]
+    # Remove empty parts
+    all_parts = [part for part in all_parts if part]
+
+    if len(all_parts) <= num_chunks:
+        # If we have fewer parts than desired chunks, return all parts
+        return all_parts
+
+    # Distribute the text across the desired number of chunks
+    chunks = []
+    chunk_size = len(all_parts) // num_chunks
+    remainder = len(all_parts) % num_chunks
+
+    start_idx = 0
+    for i in range(num_chunks):
+        # Add one extra part to some chunks to handle remainder
+        current_chunk_size = chunk_size + (1 if i < remainder else 0)
+        end_idx = start_idx + current_chunk_size
+
+        # Join the parts for this chunk
+        chunk_content = ''.join(all_parts[start_idx:end_idx])
+        if chunk_content:  # Only add non-empty chunks
+            chunks.append(chunk_content)
+
+        start_idx = end_idx
+
+    return chunks
 
 
 def generate_sse_stream(messages: List[Dict[str, str]], completion_id: str, thread_id: str):
-    """Generate SSE stream in Langbase/OpenAI format."""
+    """Generate SSE stream in Langbase/OpenAI format with configurable timing and chunk count."""
 
     # Generate response text
     response_text = get_sample_response(messages)
-    chunks = split_into_chunks(response_text)
+    chunks = generate_random_chunks(response_text, MIN_CHUNKS, MAX_CHUNKS)
 
     # Common fields for all chunks
     created_timestamp = int(time.time())
     model_name = "gpt-4o-mini"
     system_fingerprint = f"fp_{uuid.uuid4().hex[:12]}"
+
+    print(f"[DEBUG] Streaming {len(chunks)} chunks with {CHUNK_DELAY_SECONDS}s delay each")
 
     # Stream each chunk
     for i, chunk_content in enumerate(chunks):
@@ -87,8 +123,9 @@ def generate_sse_stream(messages: List[Dict[str, str]], completion_id: str, thre
 
         yield f"data: {json.dumps(chunk_data)}\n\n"
 
-        # Add small delay to simulate real streaming
-        time.sleep(0.05)
+        # Add configurable delay to simulate real streaming
+        if i < len(chunks) - 1:  # Don't delay after the last chunk
+            time.sleep(CHUNK_DELAY_SECONDS)
 
     # Send final chunk with finish_reason and usage
     final_chunk = {

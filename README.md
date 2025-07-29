@@ -90,6 +90,8 @@ curl -X POST http://localhost:8000/v1/pipes/run \
   }'
 ```
 
+
+
 ### Using curl (Non-streaming)
 
 ```bash
@@ -162,6 +164,24 @@ The server follows the exact Langbase API streaming format:
 3. **Custom header** `lb-thread-id` contains a UUID v4
 4. **Final chunk** includes usage information and `finish_reason: "stop"`
 5. **Stream ends** with `data: [DONE]\n\n`
+
+## Configuration
+
+The server behavior can be configured by modifying constants in `main.py`:
+
+```python
+# Configuration constants
+CHUNK_DELAY_SECONDS = 1.0  # Delay between chunks (seconds)
+MIN_CHUNKS = 5  # Minimum number of chunks to generate
+MAX_CHUNKS = 10  # Maximum number of chunks to generate
+```
+
+**Configuration Options:**
+- `CHUNK_DELAY_SECONDS`: Time delay between each chunk (default: 1.0 second)
+- `MIN_CHUNKS`: Minimum number of chunks per response (default: 5)
+- `MAX_CHUNKS`: Maximum number of chunks per response (default: 10)
+
+The actual number of chunks for each response is randomly selected between `MIN_CHUNKS` and `MAX_CHUNKS`.
 
 ## Development
 
