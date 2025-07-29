@@ -236,9 +236,27 @@ The server follows the exact Langbase API streaming format:
 4. **Final chunk** includes usage information and `finish_reason: "stop"`
 5. **Stream ends** with `data: [DONE]\n\n`
 
+## Architecture
+
+The server follows SOLID principles with a modular architecture:
+
+### **Core Modules:**
+
+- **`main.py`** - Entry point and server setup
+- **`http_handler.py`** - HTTP request handling and routing
+- **`pipes.py`** - Pipe/streaming functionality (SSE generation, response handling)
+- **`threads.py`** - Thread management (storage, CRUD operations)
+
+### **Key Design Principles:**
+
+- **Single Responsibility**: Each module has a focused purpose
+- **Dependency Inversion**: High-level modules depend on abstractions
+- **Interface Segregation**: Clean separation between HTTP handling and business logic
+- **Open/Closed**: Easy to extend with new endpoints or functionality
+
 ## Configuration
 
-The server behavior can be configured by modifying constants in `main.py`:
+The server behavior can be configured by modifying constants in `pipes.py`:
 
 ```python
 # Configuration constants
