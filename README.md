@@ -28,6 +28,18 @@ The server will start on `http://localhost:8000`
 
 Main endpoint that mimics the Langbase Pipe Run API.
 
+### POST /v1/threads
+
+Create a new conversation thread with optional initial messages and metadata.
+
+### POST /v1/threads/{threadId}/messages
+
+Append new messages to an existing thread.
+
+### GET /v1/threads/{threadId}/messages
+
+Retrieve all messages in a specific thread in chronological order.
+
 **Request Body:**
 ```json
 {
@@ -106,6 +118,65 @@ curl -X POST http://localhost:8000/v1/pipes/run \
     ],
     "stream": false
   }'
+```
+
+### Thread Management Examples
+
+#### Create a new thread
+
+```bash
+curl -X POST http://localhost:8000/v1/threads \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "userId": "user123",
+      "topic": "support"
+    },
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello, I need help!"
+      }
+    ]
+  }'
+```
+
+#### Create a thread with custom ID
+
+```bash
+curl -X POST http://localhost:8000/v1/threads \
+  -H "Content-Type: application/json" \
+  -d '{
+    "threadId": "custom-thread-123",
+    "metadata": {
+      "department": "billing"
+    }
+  }'
+```
+
+#### Append messages to a thread
+
+```bash
+curl -X POST http://localhost:8000/v1/threads/custom-thread-123/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Can you help me with billing?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sure! I can help with billing questions."
+      }
+    ]
+  }'
+```
+
+#### List messages in a thread
+
+```bash
+curl -X GET http://localhost:8000/v1/threads/custom-thread-123/messages
 ```
 
 ### Using JavaScript (Browser)

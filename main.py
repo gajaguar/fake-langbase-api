@@ -13,6 +13,11 @@ from urllib.parse import urlparse
 CHUNK_DELAY_SECONDS = 1.0  # Configurable delay between chunks (default: 1 second)
 MIN_CHUNKS = 5  # Minimum number of chunks (configurable)
 MAX_CHUNKS = 10  # Maximum number of chunks (configurable)
+MIN_PATH_PARTS = 4  # Minimum path parts for thread ID extraction
+
+# In-memory storage for threads and messages
+THREADS_STORAGE = {}  # {thread_id: thread_data}
+MESSAGES_STORAGE = {}  # {thread_id: [message_data, ...]}
 
 # Sample responses for simulation
 SAMPLE_RESPONSES = [
@@ -83,6 +88,30 @@ def generate_random_chunks(text: str, min_chunks: int = MIN_CHUNKS, max_chunks: 
     return chunks
 
 
+def create_thread_data(thread_id: str, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "id": thread_id,
+        "object": "thread",
+        "created_at": int(time.time()),
+        "metadata": metadata or {},
+    }
+
+
+def create_message_data(message_id: str, thread_id: str, message_dict: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": message_id,
+        "thread_id": thread_id,
+        "created_at": int(time.time()),
+        "role": message_dict.get("role"),
+        "content": message_dict.get("content"),
+        "tool_call_id": message_dict.get("tool_call_id"),
+        "tool_calls": message_dict.get("tool_calls", []),
+        "name": message_dict.get("name"),
+        "attachments": message_dict.get("attachments", []),
+        "metadata": message_dict.get("metadata", {}),
+    }
+
+
 def generate_sse_stream(messages: list[dict[str, str]], completion_id: str, _thread_id: str):
     # Generate response text
     response_text = get_sample_response(messages)
@@ -147,6 +176,8 @@ class SSERequestHandler(BaseHTTPRequestHandler):
             self.send_json_response({"message": "SSE Server is running", "version": "0.1.0"})
         elif parsed_path.path == "/health":
             self.send_json_response({"status": "healthy", "timestamp": int(time.time())})
+        elif parsed_path.path.startswith("/v1/threads/") and parsed_path.path.endswith("/messages"):
+            self.handle_list_messages()
         else:
             self.send_error(404, "Not Found")
 
@@ -155,6 +186,10 @@ class SSERequestHandler(BaseHTTPRequestHandler):
 
         if parsed_path.path == "/v1/pipes/run":
             self.handle_run_pipe()
+        elif parsed_path.path == "/v1/threads":
+            self.handle_create_thread()
+        elif parsed_path.path.startswith("/v1/threads/") and parsed_path.path.endswith("/messages"):
+            self.handle_append_messages()
         else:
             self.send_error(404, "Not Found")
 
@@ -234,6 +269,101 @@ class SSERequestHandler(BaseHTTPRequestHandler):
 
         except json.JSONDecodeError:
             self.send_error(400, "Invalid JSON")
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_error(500, f"Internal Server Error: {e!s}")
+
+    def handle_create_thread(self):
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode("utf-8")) if content_length > 0 else {}
+
+            # Generate thread ID
+            thread_id = request_data.get("threadId", f"thread_{uuid.uuid4().hex}")
+
+            # Check if thread already exists
+            if thread_id in THREADS_STORAGE:
+                self.send_error(409, "Thread already exists")
+                return
+
+            # Create thread
+            metadata = request_data.get("metadata", {})
+            thread_data = create_thread_data(thread_id, metadata)
+            THREADS_STORAGE[thread_id] = thread_data
+            MESSAGES_STORAGE[thread_id] = []
+
+            # Process initial messages if provided
+            initial_messages = request_data.get("messages", [])
+            for msg in initial_messages:
+                message_id = f"msg_{uuid.uuid4().hex}"
+                message_data = create_message_data(message_id, thread_id, msg)
+                MESSAGES_STORAGE[thread_id].append(message_data)
+
+            self.send_json_response(thread_data, 201)
+
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_error(500, f"Internal Server Error: {e!s}")
+
+    def handle_append_messages(self):
+        try:
+            # Extract thread ID from path
+            path_parts = self.path.split("/")
+            if len(path_parts) < MIN_PATH_PARTS:
+                self.send_error(400, "Invalid thread ID")
+                return
+            thread_id = path_parts[3]
+
+            # Check if thread exists
+            if thread_id not in THREADS_STORAGE:
+                self.send_error(404, "Thread not found")
+                return
+
+            # Parse request body
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode("utf-8"))
+
+            # Validate messages array
+            messages = request_data.get("messages", [])
+            if not isinstance(messages, list) or not messages:
+                self.send_error(400, "Messages array is required and cannot be empty")
+                return
+
+            # Create and append messages
+            created_messages = []
+            for msg in messages:
+                message_id = f"msg_{uuid.uuid4().hex}"
+                message_data = create_message_data(message_id, thread_id, msg)
+                MESSAGES_STORAGE[thread_id].append(message_data)
+                created_messages.append(message_data)
+
+            self.send_json_response(created_messages)
+
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_error(500, f"Internal Server Error: {e!s}")
+
+    def handle_list_messages(self):
+        try:
+            # Extract thread ID from path
+            path_parts = self.path.split("/")
+            if len(path_parts) < MIN_PATH_PARTS:
+                self.send_error(400, "Invalid thread ID")
+                return
+            thread_id = path_parts[3]
+
+            # Check if thread exists
+            if thread_id not in THREADS_STORAGE:
+                self.send_error(404, "Thread not found")
+                return
+
+            # Return messages in chronological order
+            messages = MESSAGES_STORAGE.get(thread_id, [])
+            self.send_json_response(messages)
+
         except (ValueError, KeyError, TypeError) as e:
             self.send_error(500, f"Internal Server Error: {e!s}")
 
