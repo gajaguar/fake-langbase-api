@@ -24,7 +24,6 @@ SAMPLE_RESPONSES = [
 
 
 def get_sample_response(messages: list[dict[str, str]]) -> str:
-    """Generate a sample response based on the input messages."""
     if not messages:
         return SAMPLE_RESPONSES[0]
 
@@ -40,7 +39,6 @@ def get_sample_response(messages: list[dict[str, str]]) -> str:
 
 
 def generate_random_chunks(text: str, min_chunks: int = MIN_CHUNKS, max_chunks: int = MAX_CHUNKS) -> list[str]:
-    """Generate a random number of chunks from the text."""
     # Determine random number of chunks
     num_chunks = secrets.randbelow(max_chunks - min_chunks + 1) + min_chunks
 
@@ -86,8 +84,6 @@ def generate_random_chunks(text: str, min_chunks: int = MIN_CHUNKS, max_chunks: 
 
 
 def generate_sse_stream(messages: list[dict[str, str]], completion_id: str, _thread_id: str):
-    """Generate SSE stream in Langbase/OpenAI format with configurable timing and chunk count."""
-
     # Generate response text
     response_text = get_sample_response(messages)
     chunks = generate_random_chunks(response_text, MIN_CHUNKS, MAX_CHUNKS)
@@ -136,10 +132,7 @@ def generate_sse_stream(messages: list[dict[str, str]], completion_id: str, _thr
 
 
 class SSERequestHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for SSE server."""
-
     def do_OPTIONS(self):
-        """Handle CORS preflight requests."""
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -148,7 +141,6 @@ class SSERequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        """Handle GET requests."""
         parsed_path = urlparse(self.path)
 
         if parsed_path.path == "/":
@@ -159,7 +151,6 @@ class SSERequestHandler(BaseHTTPRequestHandler):
             self.send_error(404, "Not Found")
 
     def do_POST(self):
-        """Handle POST requests."""
         parsed_path = urlparse(self.path)
 
         if parsed_path.path == "/v1/pipes/run":
@@ -168,7 +159,6 @@ class SSERequestHandler(BaseHTTPRequestHandler):
             self.send_error(404, "Not Found")
 
     def handle_run_pipe(self):
-        """Handle the /v1/pipes/run endpoint."""
         try:
             # Read request body
             content_length = int(self.headers.get("Content-Length", 0))
@@ -250,7 +240,6 @@ class SSERequestHandler(BaseHTTPRequestHandler):
     def send_json_response(
         self, data: dict[str, Any], status_code: int = 200, extra_headers: dict[str, str] | None = None
     ):
-        """Send a JSON response."""
         response_json = json.dumps(data)
 
         self.send_response(status_code)
@@ -265,12 +254,10 @@ class SSERequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(response_json.encode("utf-8"))
 
     def log_message(self, fmt, *args):
-        """Override to customize logging."""
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {fmt % args}")
 
 
 def run_server(host="0.0.0.0", port=8000):  # noqa: S104
-    """Run the SSE server."""
     server_address = (host, port)
     httpd = HTTPServer(server_address, SSERequestHandler)
 

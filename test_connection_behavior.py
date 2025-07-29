@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Test script to verify HTTP connection behavior after SSE streaming completes.
-"""
 
 import json
 import socket
@@ -9,7 +6,6 @@ import time
 
 
 def test_connection_closure():
-    """Test if HTTP connection closes properly after streaming completes."""
     print("Testing HTTP connection closure behavior...")
 
     # Create a raw socket connection
@@ -106,7 +102,6 @@ def test_connection_closure():
 
 
 def test_with_curl_verbose():
-    """Test connection behavior using curl with verbose output."""
     print("\nTesting with curl verbose output...")
     import subprocess
 
@@ -155,7 +150,6 @@ def test_with_curl_verbose():
 
 
 def main():
-    """Run connection behavior tests."""
     print("HTTP Connection Behavior Test")
     print("=" * 50)
 

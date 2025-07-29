@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Test script for the SSE server.
-"""
 
 import json
 import time
@@ -10,7 +7,6 @@ import urllib.request
 
 
 def test_health_endpoint():
-    """Test the health endpoint."""
     print("Testing health endpoint...")
     try:
         with urllib.request.urlopen("http://localhost:8000/health") as response:
@@ -23,7 +19,6 @@ def test_health_endpoint():
 
 
 def test_non_streaming():
-    """Test non-streaming response."""
     print("\nTesting non-streaming response...")
     try:
         data = {"messages": [{"role": "user", "content": "Hello!"}], "stream": False}
@@ -49,7 +44,6 @@ def test_non_streaming():
 
 
 def test_streaming():
-    """Test streaming response."""
     print("\nTesting streaming response...")
     try:
         data = {"messages": [{"role": "user", "content": "Hello!"}], "stream": True}
@@ -96,7 +90,6 @@ def test_streaming():
 
 
 def test_streaming_timing():
-    """Test streaming response timing with module constants."""
     print("\nTesting streaming response timing...")
     try:
         data = {"messages": [{"role": "user", "content": "Hello!"}], "stream": True}
@@ -162,7 +155,6 @@ def test_streaming_timing():
 
 
 def main():
-    """Run all tests."""
     print("SSE Server Test Suite")
     print("=" * 50)
 
