@@ -67,7 +67,8 @@ class BaseSSERequestHandler(BaseHTTPRequestHandler):
                         try:
                             self.wfile.write(chunk.encode("utf-8"))
                             self.wfile.flush()
-                        except BrokenPipeError:
+                        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                            # Client disconnected - this is normal behavior
                             break
                 finally:
                     with contextlib.suppress(OSError):
@@ -159,6 +160,21 @@ class BaseSSERequestHandler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {fmt % args}")
+
+    def handle_one_request(self):
+        """Handle a single HTTP request with improved error handling for client disconnections."""
+        try:
+            super().handle_one_request()
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            # Client disconnected - this is normal for streaming requests
+            pass
+        except ValueError as e:
+            if "I/O operation on closed file" in str(e):
+                # Client disconnected during response - this is normal
+                pass
+            else:
+                # Re-raise other ValueError exceptions
+                raise
 
 
 class SSERequestHandler(BaseSSERequestHandler):

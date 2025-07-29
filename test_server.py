@@ -120,11 +120,13 @@ def test_streaming_timing():
                         break
                     try:
                         chunk_data = json.loads(data_part)
-                        delta_content = chunk_data["choices"][0]["delta"].get("content", "")
-                        if delta_content:
-                            content_parts.append(delta_content)
-                            chunks_received += 1
-                    except json.JSONDecodeError:
+                        # Handle chunks with empty choices array (like usage chunks)
+                        if chunk_data.get("choices") and len(chunk_data["choices"]) > 0:
+                            delta_content = chunk_data["choices"][0]["delta"].get("content", "")
+                            if delta_content:
+                                content_parts.append(delta_content)
+                                chunks_received += 1
+                    except (json.JSONDecodeError, KeyError, IndexError):
                         pass
 
         end_time = time.time()
