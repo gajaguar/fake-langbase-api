@@ -4,71 +4,96 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Server-Sent Events (SSE) server that streams responses in the Langbase API format. It provides OpenAI-compatible streaming responses with proper SSE formatting and custom headers. The server uses Python's built-in HTTP server and requires Python 3.13.
+SSE Server is a Server-Sent Events implementation that streams responses in Langbase API format withOpenAI-compatible structure. The server provides both streaming and non-streaming responses with proper SSE formatting and custom headers.
 
-## Development Commands
+## Build & Development Commands
 
-- `python3 main.py` - Start the server on localhost:8000
-- `python3 test_server.py` - Run basic integration tests
-- `python3 test_connection_behavior.py` - Test connection behavior patterns
-- `uv add <package>` - Add Python dependencies (uses uv for dependency management)
-- `ruff check` - Run linting checks
-- `ruff format` - Format code according to project standards
+**Start the server:**
+```bash
+python3 main.py
+```
 
-## Architecture
+**Run tests:**
+```bash
+python3 test_server.py
+python3 test_connection_behavior.py
+```
 
-### Core Components
+**Code quality checks:**
+```bash
+ruff check .
+ruff format .
+```
 
-The application follows a modular architecture with clear separation of concerns:
+## Architecture Overview
 
-**HTTP Handler Layer** (`http_handler.py`):
-- `BaseSSERequestHandler` - Base HTTP request handler with CORS support
-- `SSERequestHandler` - Main request handler that delegates to business logic handlers
-- Handles routing for `/v1/pipes/run`, `/v1/threads`, and health endpoints
+The project follows SOLID principles with clear separation of concerns:
 
-**Business Logic Layer**:
-- **Pipes Module** (`pipes.py`) - Handles streaming and non-streaming AI responses
-  - `PipeResponseGenerator` - Generates sample responses based on message content
-  - `SSEStreamGenerator` - Creates Server-Sent Events streams with proper OpenAI formatting
-  - `PipeHandler` - Orchestrates pipe execution logic
-  
-- **Threads Module** (`threads.py`) - Manages conversation threads and message storage
-  - `ThreadStorage` - In-memory storage for threads and messages
-  - `ThreadHandler` - Business logic for thread operations (create, list, append messages)
+### Core Modules
 
-**Main Entry Point** (`main.py`):
-- Server startup and configuration
-- Imports and uses `SSERequestHandler` from `http_handler.py`
+- **`main.py`** - Server entry point using Python's built-in HTTPServer
+- **`http_handler.py`** - HTTP request routing and response handling with CORS support
+- **`pipes.py`** - SSE streaming logic, response generation, and OpenAI format compliance
+- **`threads.py`** - Thread management with in-memory storage for conversation persistence
 
-### Key Patterns
+### Key Design Patterns
 
-- **Error Handling**: Custom exception hierarchy for different error types (`PipeError`, `ThreadError` and their subclasses)
-- **Response Format**: Strict adherence to OpenAI chat completion format with Langbase-specific headers (`lb-thread-id`)
-- **Stream Generation**: Text is broken into random chunks (5-10 per response) with 1-second delays between chunks
-- **Memory Storage**: In-memory dictionaries for thread and message persistence (no external database)
+- **Dependency Inversion**: High-level modules depend on abstractions, not concretions
+- **Single Responsibility**: Each module has focused functionality
+- **Interface Segregation**: Clean separation between HTTP handling and business logic
+- **Command Pattern**: Handler classes process specific request types
 
-### Configuration
+### Request Flow
 
-Key constants in `pipes.py`:
-- `CHUNK_DELAY_SECONDS = 1.0` - Delay between streaming chunks
-- `MIN_CHUNKS = 5` / `MAX_CHUNKS = 10` - Range for random chunk generation
-- `SAMPLE_RESPONSES` - Predefined responses triggered by message content keywords
+1. `main.py` starts HTTPServer with `SSERequestHandler`
+2. `http_handler.py` routes requests and handles CORS
+3. `pipes.py` generates streaming responses with configurable chunking
+4. `threads.py` manages conversation state and message persistence
 
 ## API Endpoints
 
-- `POST /v1/pipes/run` - Main endpoint for AI completions (streaming/non-streaming)
-- `POST /v1/threads` - Create new conversation threads
-- `POST /v1/threads/{threadId}/messages` - Append messages to existing threads
+### Core Endpoints
+- `POST /v1/pipes/run` - Main streaming/non-streaming endpoint
+- `POST /v1/threads` - Create conversation thread
+- `POST /v1/threads/{threadId}/messages` - Append messages to thread
 - `GET /v1/threads/{threadId}/messages` - Retrieve thread messages
 - `GET /health` - Health check with timestamp
-- `GET /` - Basic server status
 
-## Testing
+### Response Format
+Follows OpenAI chat completion chunk structure with:
+- Custom `lb-thread-id` header (UUID v4)
+- Streaming: `text/event-stream` with `data: ` prefixed chunks
+- Non-streaming: Standard JSON response with completion object
 
-Run `python3 test_server.py` after starting the server to validate:
-- Health endpoints functionality
-- Non-streaming response format
-- Streaming SSE format and timing
-- Chunk count and delay verification
+## Configuration
 
-The test suite expects the server to be running on localhost:8000 and validates proper OpenAI format compliance, custom headers, and streaming behavior.
+**Stream timing (pipes.py:8-11):**
+```python
+CHUNK_DELAY_SECONDS = 1.0  # Delay between chunks
+MIN_CHUNKS = 5            # Minimum chunks per response
+MAX_CHUNKS = 10           # Maximum chunks per response  
+```
+
+**Response samples (pipes.py:14-19):**
+Modify `SAMPLE_RESPONSES` array for different simulated AI responses.
+
+## Technology Stack
+
+- **Runtime**: Python 3.13+ (built-in libraries only for server)
+- **Optional Dependencies**: FastAPI, Uvicorn (in pyproject.toml but not used)
+- **Code Quality**: Ruff (linting and formatting)
+- **Architecture**: Pure Python HTTP server with custom request handlers
+
+## Testing Strategy
+
+- **`test_server.py`** - Functional tests for all endpoints, streaming behavior, and timing
+- **`test_connection_behavior.py`** - Connection lifecycle and proper stream termination
+- Tests use Python's urllib for HTTP requests and raw sockets for connection testing
+- Validates OpenAI format compliance, chunk timing, and SSE protocol adherence
+
+## Development Notes
+
+- Server uses in-memory storage for threads (data lost on restart)
+- Streaming responses simulate AI generation with random chunking
+- Connection handling includes proper cleanup for broken pipes
+- CORS enabled for web application integration
