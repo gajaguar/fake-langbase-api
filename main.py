@@ -208,20 +208,27 @@ class SSERequestHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/event-stream')
                 self.send_header('Cache-Control', 'no-cache')
-                self.send_header('Connection', 'keep-alive')
+                self.send_header('Connection', 'close')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Access-Control-Expose-Headers', 'lb-thread-id')
                 self.send_header('lb-thread-id', thread_id)
                 self.end_headers()
 
                 # Stream the response
-                for chunk in generate_sse_stream(messages, completion_id, thread_id):
+                try:
+                    for chunk in generate_sse_stream(messages, completion_id, thread_id):
+                        try:
+                            self.wfile.write(chunk.encode('utf-8'))
+                            self.wfile.flush()
+                        except BrokenPipeError:
+                            # Client disconnected
+                            break
+                finally:
+                    # Ensure connection is closed after streaming completes
                     try:
-                        self.wfile.write(chunk.encode('utf-8'))
-                        self.wfile.flush()
-                    except BrokenPipeError:
-                        # Client disconnected
-                        break
+                        self.wfile.close()
+                    except:
+                        pass
             else:
                 # Send non-streaming response
                 response_text = get_sample_response(messages)
