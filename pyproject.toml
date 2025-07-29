@@ -1,0 +1,10 @@
+[project]
+name = "sse-server"
+version = "0.1.0"
+description = "Server-Sent Events server that streams responses in Langbase API format"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+]
