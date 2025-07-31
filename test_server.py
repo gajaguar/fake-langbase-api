@@ -43,6 +43,38 @@ def test_non_streaming():
         return False
 
 
+def test_variables_support():
+    print("\nTesting variables support...")
+    try:
+        data = {
+            "messages": [{"role": "user", "content": "Hello {{name}}, I am a {{profession}}!"}],
+            "variables": {"name": "Alice", "profession": "developer"},
+            "stream": False
+        }
+
+        req = urllib.request.Request(
+            "http://localhost:8000/v1/pipes/run",
+            data=json.dumps(data).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+
+        with urllib.request.urlopen(req) as response:
+            headers = dict(response.headers)
+            response_data = json.loads(response.read().decode())
+
+            print(f"✓ Status: {response.status}")
+            print(f"✓ Headers: lb-thread-id = {headers.get('lb-thread-id', 'NOT FOUND')}")
+            print(f"✓ Response: {response_data['completion'][:100]}...")
+
+            # Check if variables were processed (this is a mock, so we can't verify exact substitution in response)
+            # But we can verify the request was processed successfully
+            return True
+
+    except Exception as e:
+        print(f"✗ Variables test failed: {e}")
+        return False
+
+
 def test_streaming():
     print("\nTesting streaming response...")
     try:
@@ -163,7 +195,7 @@ def main():
     # Wait a moment for server to be ready
     time.sleep(1)
 
-    tests = [test_health_endpoint, test_non_streaming, test_streaming, test_streaming_timing]
+    tests = [test_health_endpoint, test_non_streaming, test_variables_support, test_streaming, test_streaming_timing]
 
     passed = 0
     for test in tests:

@@ -19,7 +19,7 @@ class BaseSSERequestHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Access-Control-Max-Age", "86400")
         self.end_headers()
@@ -33,6 +33,9 @@ class BaseSSERequestHandler(BaseHTTPRequestHandler):
             self.send_json_response({"status": "healthy", "timestamp": int(time.time())})
         elif parsed_path.path.startswith("/v1/threads/") and parsed_path.path.endswith("/messages"):
             self._handle_list_messages()
+        elif parsed_path.path.startswith("/v1/threads/") and not parsed_path.path.endswith("/messages"):
+            # GET /v1/threads/{threadId} - Get thread
+            self._handle_get_thread()
         else:
             self.send_error(404, "Not Found")
 
@@ -45,6 +48,18 @@ class BaseSSERequestHandler(BaseHTTPRequestHandler):
             self._handle_create_thread()
         elif parsed_path.path.startswith("/v1/threads/") and parsed_path.path.endswith("/messages"):
             self._handle_append_messages()
+        elif parsed_path.path.startswith("/v1/threads/") and not parsed_path.path.endswith("/messages"):
+            # POST /v1/threads/{threadId} - Update thread
+            self._handle_update_thread()
+        else:
+            self.send_error(404, "Not Found")
+
+    def do_DELETE(self):
+        parsed_path = urlparse(self.path)
+
+        if parsed_path.path.startswith("/v1/threads/") and not parsed_path.path.endswith("/messages"):
+            # DELETE /v1/threads/{threadId} - Delete thread
+            self._handle_delete_thread()
         else:
             self.send_error(404, "Not Found")
 
@@ -122,16 +137,56 @@ class BaseSSERequestHandler(BaseHTTPRequestHandler):
         except (ValueError, KeyError, TypeError) as e:
             self.send_error(500, f"Internal Server Error: {e!s}")
 
+    def _handle_get_thread(self):
+        try:
+            thread_id = self._extract_thread_id()
+            result, status_code = thread_handler.handle_get_thread(thread_id)
+            self.send_json_response(result, status_code)
+
+        except ThreadNotFoundError:
+            self.send_error(404, "Thread not found")
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_error(500, f"Internal Server Error: {e!s}")
+
+    def _handle_update_thread(self):
+        try:
+            thread_id = self._extract_thread_id()
+            request_data = self._parse_request_body()
+            result, status_code = thread_handler.handle_update_thread(thread_id, request_data)
+            self.send_json_response(result, status_code)
+
+        except ThreadNotFoundError:
+            self.send_error(404, "Thread not found")
+        except InvalidRequestError as e:
+            self.send_error(400, str(e))
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_error(500, f"Internal Server Error: {e!s}")
+
+    def _handle_delete_thread(self):
+        try:
+            thread_id = self._extract_thread_id()
+            result, status_code = thread_handler.handle_delete_thread(thread_id)
+            self.send_json_response(result, status_code)
+
+        except ThreadNotFoundError:
+            self.send_error(404, "Thread not found")
+        except (ValueError, KeyError, TypeError) as e:
+            self.send_error(500, f"Internal Server Error: {e!s}")
+
     def _extract_thread_id(self) -> str:
         path_parts = self.path.split("/")
         if len(path_parts) < MIN_PATH_PARTS:
-            raise ValueError("Invalid thread ID")
+            msg = "Invalid thread ID"
+            raise ValueError(msg)
         return path_parts[3]
 
     def _parse_request_body(self, allow_empty: bool = False) -> dict[str, Any]:
         content_length = int(self.headers.get("Content-Length", 0))
         if content_length == 0 and not allow_empty:
-            raise ValueError("Request body is required")
+            msg = "Request body is required"
+            raise ValueError(msg)
 
         if content_length == 0:
             return {}
