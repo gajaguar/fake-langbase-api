@@ -10,8 +10,7 @@ class ThreadStorage:
 
     def create_thread(self, thread_id: str | None = None, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         if thread_id is None:
-            # Generate Langbase-compatible thread ID
-            thread_id = f"thread_{uuid.uuid4().hex[:8]}{uuid.uuid4().hex[:8]}{uuid.uuid4().hex[:8]}"
+            thread_id = f"thread_{uuid.uuid4()}"
 
         if thread_id in self._threads:
             msg = f"Thread {thread_id} already exists"
@@ -45,8 +44,7 @@ class ThreadStorage:
 
         created_messages = []
         for msg in messages:
-            # Generate Langbase-compatible message ID
-            message_id = f"msg_{uuid.uuid4().hex[:8]}{uuid.uuid4().hex[:8]}{uuid.uuid4().hex[:8]}"
+            message_id = f"msg_{uuid.uuid4()}"
             message_data = self._create_message_data(message_id, thread_id, msg)
             self._messages[thread_id].append(message_data)
             created_messages.append(message_data)

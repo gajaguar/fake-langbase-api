@@ -333,7 +333,7 @@ class PipeHandler:
 
         stream = request_data.get("stream", False)
         thread_id = request_data.get("threadId", str(uuid.uuid4()))
-        completion_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
+        completion_id = f"chatcmpl-{uuid.uuid4()}"
 
         if stream:
             headers = {
