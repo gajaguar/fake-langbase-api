@@ -10,4 +10,7 @@ wheels/
 .venv
 
 # JetBrains' IDE
-.idea
+.idea/
+
+# AI Tools
+.serena/
